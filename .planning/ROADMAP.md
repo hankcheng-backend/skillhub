@@ -31,7 +31,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — CORS removal and shell injection audit (SEC-01, SEC-03)
+- [x] 01-01-PLAN.md — CORS removal and shell injection audit (SEC-01, SEC-03)
 - [ ] 01-02-PLAN.md — Database migration system with rusqlite_migration (DB-01, DB-02)
 - [ ] 01-03-PLAN.md — Backend PAT 401 detection and update_source_token command (SEC-02 backend)
 - [ ] 01-04-PLAN.md — Frontend PAT expiry UX: badge, modal, auto-retry, i18n (SEC-02 frontend)
