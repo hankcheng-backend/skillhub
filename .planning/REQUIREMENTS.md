@@ -10,13 +10,13 @@ Requirements for public launch. Each maps to roadmap phases.
 ### Security
 
 - [x] **SEC-01**: CORS on `/health` restricted to `tauri://localhost` and `http://localhost:1420` — no wildcard
-- [ ] **SEC-02**: GitLab PAT 401 response detected and surfaced as "token expired — update it" with in-place re-entry (no source delete/re-add)
+- [x] **SEC-02**: GitLab PAT 401 response detected and surfaced as "token expired — update it" with in-place re-entry (no source delete/re-add)
 - [x] **SEC-03**: Shell injection audit complete — no user-controlled string passed as shell argument; Rust version >= 1.77.2 for CVE-2024-24576
 
 ### Database
 
-- [ ] **DB-01**: Schema migrations managed by `rusqlite_migration` with existing DDL as migration 0; `user_version` PRAGMA validated
-- [ ] **DB-02**: Migration tested with real v1 DB snapshot — existing user data survives upgrade
+- [x] **DB-01**: Schema migrations managed by `rusqlite_migration` with existing DDL as migration 0; `user_version` PRAGMA validated
+- [x] **DB-02**: Migration tested with real v1 DB snapshot — existing user data survives upgrade
 
 ### Backend Structure
 
@@ -81,10 +81,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | SEC-01 | Phase 1 | Complete |
-| SEC-02 | Phase 1 | Pending |
+| SEC-02 | Phase 1 | Complete |
 | SEC-03 | Phase 1 | Complete |
-| DB-01 | Phase 1 | Pending |
-| DB-02 | Phase 1 | Pending |
+| DB-01 | Phase 1 | Complete |
+| DB-02 | Phase 1 | Complete |
 | BE-01 | Phase 2 | Pending |
 | BE-02 | Phase 2 | Pending |
 | BE-03 | Phase 2 | Pending |

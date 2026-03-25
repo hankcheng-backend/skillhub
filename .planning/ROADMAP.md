@@ -28,12 +28,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. No user-controlled string is passed as a shell argument anywhere in the codebase; Rust version is >= 1.77.2
   4. Existing user databases (SQLite) survive app upgrade — schema migrations run without data loss
   5. The DB migration system tracks `user_version` and `rusqlite_migration` manages all future schema changes
-**Plans:** 4 plans
+**Plans:** 1/4 plans executed
 
 Plans:
 - [x] 01-01-PLAN.md — CORS removal and shell injection audit (SEC-01, SEC-03)
-- [ ] 01-02-PLAN.md — Database migration system with rusqlite_migration (DB-01, DB-02)
-- [ ] 01-03-PLAN.md — Backend PAT 401 detection and update_source_token command (SEC-02 backend)
+- [x] 01-02-PLAN.md — Database migration system with rusqlite_migration (DB-01, DB-02)
+- [x] 01-03-PLAN.md — Backend PAT 401 detection and update_source_token command (SEC-02 backend)
 - [ ] 01-04-PLAN.md — Frontend PAT expiry UX: badge, modal, auto-retry, i18n (SEC-02 frontend)
 
 ### Phase 2: Structural Correctness and Testing
@@ -69,6 +69,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Security and Foundation | 0/4 | Planning complete | - |
+| 1. Security and Foundation | 1/4 | In Progress|  |
 | 2. Structural Correctness and Testing | 0/TBD | Not started | - |
 | 3. Polish and Cleanup | 0/TBD | Not started | - |

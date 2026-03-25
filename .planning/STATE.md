@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 01-security-and-foundation/01-01-PLAN.md
-last_updated: "2026-03-25T05:42:46.133Z"
+stopped_at: Completed 01-02-PLAN.md - database migration system
+last_updated: "2026-03-25T05:46:22.180Z"
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 3
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 01 (security-and-foundation) — EXECUTING
-Plan: 2 of 4
+Plan: 4 of 4
 
 ## Performance Metrics
 
@@ -47,6 +47,8 @@ Plan: 2 of 4
 
 *Updated after each plan completion*
 | Phase 01-security-and-foundation P01 | 145 | 2 tasks | 1 files |
+| Phase 01 P03 | 6 | 2 tasks | 5 files |
+| Phase 01 P02 | 25 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -60,6 +62,10 @@ Recent decisions affecting current work:
 - Roadmap: Code signing (DIST-01, DIST-02) deferred to v2 — certificate procurement has external timelines
 - [Phase 01-security-and-foundation]: Health endpoint returns bare StatusCode::OK with no CORS headers (D-06 compliance)
 - [Phase 01-security-and-foundation]: Shell injection audit confirmed: Command::new only uses OS-env or DB-validated agent IDs; Rust 1.94.0 mitigates CVE-2024-24576
+- [Phase 01]: gitlab.rs returns TokenExpired('unauthorized') as sentinel; sources.rs re-wraps with actual source_id, keeping gitlab.rs stateless
+- [Phase 01]: update_source_token updates PAT in-place via existing keychain entry — no source UUID churn
+- [Phase 01]: Used rusqlite_migration 1.2.0 (not 2.5) for rusqlite 0.31 compatibility
+- [Phase 01]: DB backup created before Connection::open to avoid WAL sidecar corruption (D-10)
 
 ### Pending Todos
 
@@ -72,6 +78,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T05:42:46.131Z
-Stopped at: Completed 01-security-and-foundation/01-01-PLAN.md
+Last session: 2026-03-25T05:46:22.178Z
+Stopped at: Completed 01-02-PLAN.md - database migration system
 Resume file: None
