@@ -1,0 +1,22 @@
+{
+  "name": "skillhub-mcp-stdio",
+  "version": "0.0.0",
+  "description": "SkillHub MCP server over stdio — manage AI agent skills via JSON-RPC",
+  "bin": {
+    "skillhub-mcp-stdio": "bin/run.js"
+  },
+  "files": [
+    "bin/run.js"
+  ],
+  "optionalDependencies": {
+    "skillhub-mcp-stdio-darwin-arm64": "0.0.0",
+    "skillhub-mcp-stdio-darwin-x64": "0.0.0",
+    "skillhub-mcp-stdio-win32-x64": "0.0.0"
+  },
+  "keywords": ["mcp", "skillhub", "ai-agent", "skills", "stdio"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hankcheng-backend/skillhub"
+  }
+}

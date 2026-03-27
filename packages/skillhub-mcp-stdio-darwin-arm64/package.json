@@ -1,0 +1,13 @@
+{
+  "name": "skillhub-mcp-stdio-darwin-arm64",
+  "version": "0.0.0",
+  "description": "SkillHub MCP stdio binary for macOS Apple Silicon",
+  "os": ["darwin"],
+  "cpu": ["arm64"],
+  "files": ["bin/skillhub-mcp-stdio"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hankcheng-backend/skillhub"
+  }
+}
