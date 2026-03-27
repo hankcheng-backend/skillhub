@@ -6,9 +6,11 @@ interface SidebarProps {
   activeSource: string;
   onSelectSource: (id: string) => void;
   onAddSource: () => void;
+  expiredSourceIds: Set<string>;
+  onTokenUpdate: (sourceId: string) => void;
 }
 
-export function Sidebar({ sources, activeSource, onSelectSource, onAddSource }: SidebarProps) {
+export function Sidebar({ sources, activeSource, onSelectSource, onAddSource, expiredSourceIds, onTokenUpdate }: SidebarProps) {
   return (
     <aside className="app-sidebar">
       <button className="sidebar-add-btn" onClick={onAddSource}>
@@ -34,19 +36,23 @@ export function Sidebar({ sources, activeSource, onSelectSource, onAddSource }: 
         {t("localSkills")}
       </div>
 
-      {sources.map(source => (
-        <div
-          key={source.id}
-          className={`sidebar-item${activeSource === source.id ? " active" : ""}`}
-          role="button"
-          tabIndex={0}
-          onClick={() => onSelectSource(source.id)}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectSource(source.id); } }}
-        >
-          <span className="sidebar-item-icon">{source.type === "gitlab" ? "🦊" : "📁"}</span>
-          {source.name}
-        </div>
-      ))}
+      {sources.map(source => {
+        const isExpired = expiredSourceIds.has(source.id);
+        return (
+          <div
+            key={source.id}
+            className={`sidebar-item${activeSource === source.id ? " active" : ""}`}
+            role="button"
+            tabIndex={0}
+            onClick={() => isExpired ? onTokenUpdate(source.id) : onSelectSource(source.id)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); isExpired ? onTokenUpdate(source.id) : onSelectSource(source.id); } }}
+          >
+            <span className="sidebar-item-icon">{source.type === "gitlab" ? "🦊" : "📁"}</span>
+            {source.name}
+            {isExpired && <span className="pat-expired-badge">{t("patExpiredBadge")}</span>}
+          </div>
+        );
+      })}
     </aside>
   );
 }

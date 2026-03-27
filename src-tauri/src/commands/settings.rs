@@ -2,6 +2,7 @@ use crate::commands::skills::DbState;
 use crate::db::models::Agent;
 use crate::error::AppError;
 use crate::scanner;
+use crate::watcher;
 use rusqlite;
 use serde::Serialize;
 use std::sync::OnceLock;
@@ -71,27 +72,47 @@ pub enum AgentDirStatus {
 
 #[tauri::command]
 pub fn get_agents(db: State<'_, DbState>) -> Result<Vec<Agent>, AppError> {
-    let conn = db.lock().unwrap();
+    let conn = db
+        .lock()
+        .map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
     Agent::all(&conn).map_err(AppError::from)
 }
 
 #[tauri::command]
 pub fn update_agent(
     db: State<'_, DbState>,
+    watcher: State<'_, watcher::WatcherState>,
     app: tauri::AppHandle,
     agent_id: String,
     enabled: bool,
     skill_dir: Option<String>,
 ) -> Result<(), AppError> {
     {
-        let conn = db.lock().unwrap();
+        let conn = db
+            .lock()
+            .map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
         Agent::update(&conn, &agent_id, enabled, skill_dir.as_deref())?;
     }
 
     {
-        let conn = db.lock().unwrap();
+        let conn = db
+            .lock()
+            .map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
         let _ = scanner::scan_all(&conn)?;
     }
+
+    // Dynamic watcher registration — add newly enabled agent's skill dir (D-11)
+    if enabled {
+        let conn = db
+            .lock()
+            .map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
+        let agent = Agent::find_by_id(&conn, &agent_id)?;
+        let dir = agent.resolved_skill_dir();
+        if dir.exists() {
+            let _ = watcher::add_paths(&watcher, &[dir]);
+        }
+    }
+
     let _ = app.emit("skills-changed", ());
     Ok(())
 }
@@ -178,7 +199,7 @@ pub async fn get_latest_versions() -> Result<LatestVersions, AppError> {
 
 #[tauri::command]
 pub fn get_config(db: State<'_, DbState>, key: String) -> Option<String> {
-    let conn = db.lock().unwrap();
+    let conn = db.lock().ok()?;
     conn.query_row(
         "SELECT value FROM app_config WHERE key = ?1",
         rusqlite::params![key],
@@ -189,7 +210,9 @@ pub fn get_config(db: State<'_, DbState>, key: String) -> Option<String> {
 
 #[tauri::command]
 pub fn set_config(db: State<'_, DbState>, key: String, value: String) -> Result<(), AppError> {
-    let conn = db.lock().unwrap();
+    let conn = db
+        .lock()
+        .map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
     conn.execute(
         "INSERT OR REPLACE INTO app_config (key, value) VALUES (?1, ?2)",
         rusqlite::params![key, value],
@@ -221,7 +244,9 @@ pub async fn check_agent_dir(
     agent_id: String,
 ) -> Result<AgentDirStatus, AppError> {
     let agent = {
-        let conn = db.lock().unwrap();
+        let conn = db
+            .lock()
+            .map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
         Agent::find_by_id(&conn, &agent_id)?
     };
 

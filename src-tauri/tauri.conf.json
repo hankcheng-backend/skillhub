@@ -33,6 +33,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/hankcheng-backend/skillhub/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJGQjg4NjUzMUU0M0YwMDYKUldRRzhFTWVVNGE0TDJuUWFLWjNHa2tlZ3IzUG9ZdThiQzdubkd2NUx4NVpOYjFlTG1maXZCMngK"
+    }
   }
 }

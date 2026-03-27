@@ -1,14 +1,18 @@
 use crate::db::models::Agent;
-use notify_debouncer_mini::{new_debouncer, DebouncedEventKind};
+use notify_debouncer_mini::{new_debouncer, Debouncer, DebouncedEventKind};
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::Emitter;
 
+/// Managed watcher state — stored via `app.manage()` instead of `Box::leak`.
+/// The inner `Option` is `None` only if the debouncer failed to initialize.
+pub type WatcherState = Arc<Mutex<Option<Debouncer<notify::RecommendedWatcher>>>>;
+
 pub fn start_watching(
     db: Arc<Mutex<Connection>>,
     app_handle: tauri::AppHandle,
-) -> Result<notify_debouncer_mini::Debouncer<notify::RecommendedWatcher>, crate::error::AppError> {
+) -> Result<WatcherState, crate::error::AppError> {
     let db_clone = db.clone();
 
     let mut debouncer = new_debouncer(
@@ -19,10 +23,12 @@ pub fn start_watching(
                     .iter()
                     .any(|e| matches!(e.kind, DebouncedEventKind::Any));
                 if has_changes {
-                    if let Ok(conn) = db_clone.lock() {
-                        let _ = crate::scanner::scan_all(&conn);
-                        let _ = app_handle.emit("skills-changed", ());
-                    }
+                    let conn = match db_clone.lock() {
+                        Ok(c) => c,
+                        Err(_) => return, // Inside callback — cannot propagate error
+                    };
+                    let _ = crate::scanner::scan_all(&conn);
+                    let _ = app_handle.emit("skills-changed", ());
                 }
             }
         },
@@ -35,7 +41,13 @@ pub fn start_watching(
     })?;
 
     {
-        let conn = db.lock().unwrap();
+        let conn = match db.lock() {
+            Ok(c) => c,
+            Err(_) => {
+                // DB lock poisoned at startup — return an empty watcher state
+                return Ok(Arc::new(Mutex::new(None)));
+            }
+        };
         let agents = Agent::enabled(&conn)?;
         for agent in &agents {
             let dir = agent.resolved_skill_dir();
@@ -47,5 +59,30 @@ pub fn start_watching(
         }
     }
 
-    Ok(debouncer)
+    Ok(Arc::new(Mutex::new(Some(debouncer))))
+}
+
+/// Dynamically register additional paths with the running watcher.
+/// Called when an agent is enabled after startup so its skill directory
+/// is watched without requiring an app restart (D-11).
+///
+/// Returns `Ok(())` silently if the watcher has not been initialized.
+pub fn add_paths(
+    watcher_state: &WatcherState,
+    paths: &[std::path::PathBuf],
+) -> Result<(), crate::error::AppError> {
+    let mut guard = watcher_state
+        .lock()
+        .map_err(|e| crate::error::AppError::Internal(format!("Watcher lock poisoned: {}", e)))?;
+    let Some(ref mut debouncer) = *guard else {
+        return Ok(()); // Watcher not initialized — no-op
+    };
+    for path in paths {
+        if path.exists() {
+            let _ = debouncer
+                .watcher()
+                .watch(path, notify::RecursiveMode::NonRecursive);
+        }
+    }
+    Ok(())
 }

@@ -99,6 +99,9 @@ async fn get_default_branch(
         .await
         .map_err(|e| AppError::Remote(format!("GitLab API error: {}", e)))?;
 
+    if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+        return Err(AppError::TokenExpired("unauthorized".into()));
+    }
     if !resp.status().is_success() {
         return Err(AppError::Remote(format!(
             "GitLab project info failed ({}): {}",
@@ -171,6 +174,9 @@ async fn fetch_skill_md(
                 .map_err(|e| AppError::Remote(format!("Failed to read response: {}", e)))?;
             return Ok(Some(text));
         }
+        if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+            return Err(AppError::TokenExpired("unauthorized".into()));
+        }
         if resp.status().as_u16() != 404 {
             return Err(AppError::Remote(format!(
                 "GitLab file fetch failed ({})",
@@ -194,6 +200,14 @@ pub async fn get_skill_content(
     fetch_skill_md(&client, &host, &project, &branch, folder_name).await
 }
 
+pub async fn validate_source_access(repo_url: &str, token: &str) -> Result<(), AppError> {
+    let (host, project) = parse_repo_url(repo_url)?;
+    let client = build_client(token)?;
+    // Project info endpoint validates both repository visibility and token access.
+    let _ = get_default_branch(&client, &host, &project).await?;
+    Ok(())
+}
+
 pub async fn list_skills(repo_url: &str, token: &str) -> Result<Vec<RemoteSkill>, AppError> {
     let (host, project) = parse_repo_url(repo_url)?;
     let client = build_client(token)?;
@@ -204,29 +218,64 @@ pub async fn list_skills(repo_url: &str, token: &str) -> Result<Vec<RemoteSkill>
     };
     let branch_encoded = encode_component(&branch);
 
-    let tree_url = format!(
-        "https://{}/api/v4/projects/{}/repository/tree?per_page=100&ref={}",
-        host, project, branch_encoded
-    );
-    let resp = client
-        .get(&tree_url)
-        .send()
-        .await
-        .map_err(|e| AppError::Remote(format!("GitLab API error: {}", e)))?;
+    // Pagination loop — fetch all tree pages (D-11), cap at 500 items / 5 pages (D-12)
+    let max_pages = 5;
+    let mut all_items: Vec<TreeItem> = Vec::new();
+    let mut page = 1u32;
 
-    if !resp.status().is_success() {
-        return Err(AppError::Remote(format!(
-            "GitLab tree listing failed ({})",
-            resp.status()
-        )));
+    loop {
+        let tree_url = format!(
+            "https://{}/api/v4/projects/{}/repository/tree?per_page=100&ref={}&page={}",
+            host, project, branch_encoded, page
+        );
+        let resp = client
+            .get(&tree_url)
+            .send()
+            .await
+            .map_err(|e| AppError::Remote(format!("GitLab API error: {}", e)))?;
+
+        if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+            return Err(AppError::TokenExpired("unauthorized".into()));
+        }
+        if !resp.status().is_success() {
+            return Err(AppError::Remote(format!(
+                "GitLab tree listing failed ({})",
+                resp.status()
+            )));
+        }
+
+        // Read X-Next-Page header before consuming the response body
+        let next_page: Option<u32> = resp
+            .headers()
+            .get("x-next-page")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse().ok());
+
+        let items: Vec<TreeItem> = resp
+            .json()
+            .await
+            .map_err(|e| AppError::Remote(format!("Failed to parse tree: {}", e)))?;
+
+        all_items.extend(items);
+
+        match next_page {
+            Some(np) if np > 0 && page < max_pages as u32 => {
+                page = np;
+            }
+            _ => break,
+        }
     }
 
-    let items: Vec<TreeItem> = resp
-        .json()
-        .await
-        .map_err(|e| AppError::Remote(format!("Failed to parse tree: {}", e)))?;
+    let capped = page >= max_pages as u32;
+    if capped {
+        log::warn!(
+            "GitLab source {}: reached {} skill page limit — repository may have more skills",
+            repo_url,
+            max_pages
+        );
+    }
 
-    let folders: Vec<&TreeItem> = items
+    let folders: Vec<&TreeItem> = all_items
         .iter()
         .filter(|item| item.item_type == "tree")
         .collect();
@@ -281,6 +330,9 @@ pub async fn download_skill(
         .await
         .map_err(|e| AppError::Remote(format!("GitLab API error: {}", e)))?;
 
+    if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+        return Err(AppError::TokenExpired("unauthorized".into()));
+    }
     if !resp.status().is_success() {
         return Err(AppError::Remote(format!(
             "GitLab tree listing for '{}' failed ({})",
@@ -310,6 +362,9 @@ pub async fn download_skill(
                 AppError::Remote(format!("Failed to download {}: {}", file.path, e))
             })?;
 
+        if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+            return Err(AppError::TokenExpired("unauthorized".into()));
+        }
         if !resp.status().is_success() {
             return Err(AppError::Remote(format!(
                 "Failed to download {} ({})",
@@ -369,6 +424,8 @@ pub async fn upload_skill(
                 .await
                 .map_err(|e| AppError::Remote(format!("Failed to parse tree: {}", e)))?;
             !items.is_empty()
+        } else if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+            return Err(AppError::TokenExpired("unauthorized".into()));
         } else if resp.status().as_u16() == 404 {
             false
         } else {
@@ -451,6 +508,9 @@ pub async fn upload_skill(
         .await
         .map_err(|e| AppError::Remote(format!("GitLab commit API error: {}", e)))?;
 
+    if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+        return Err(AppError::TokenExpired("unauthorized".into()));
+    }
     if !resp.status().is_success() {
         return Err(AppError::Remote(format!(
             "GitLab commit failed ({}): {}",

@@ -1,23 +1,13 @@
 use crate::error::AppError;
 use rusqlite::Connection;
+use rusqlite_migration::{Migrations, M};
 use std::path::Path;
 
 pub mod models;
 
-/// Returns (Connection, is_fresh) where is_fresh = true when DB was just created.
-pub fn init_db(db_path: &Path) -> Result<(Connection, bool), AppError> {
-    let is_fresh = !db_path.exists();
-    let conn = Connection::open(db_path)?;
-    conn.execute_batch(
-        "PRAGMA journal_mode=WAL;
-         PRAGMA foreign_keys=ON;",
-    )?;
-    migrate(&conn)?;
-    Ok((conn, is_fresh))
-}
-
-fn migrate(conn: &Connection) -> Result<(), AppError> {
-    conn.execute_batch(
+const MIGRATIONS: &[M<'static>] = &[
+    // Migration 0: initial schema (existing DDL verbatim from v0.1.0)
+    M::up(
         "CREATE TABLE IF NOT EXISTS agents (
             id TEXT PRIMARY KEY,
             enabled INTEGER DEFAULT 0,
@@ -66,10 +56,53 @@ fn migrate(conn: &Connection) -> Result<(), AppError> {
             value TEXT NOT NULL
         );
 
-        INSERT OR IGNORE INTO app_config (key, value) VALUES ('mcp_port', '9800');
-        ",
+        INSERT OR IGNORE INTO app_config (key, value) VALUES ('mcp_port', '9800');",
+    ),
+];
+
+/// Returns (Connection, is_fresh) where is_fresh = true when DB was just created.
+/// D-10: Backup existing DB before migration (before opening connection).
+/// D-11: Restore from backup on failure; caller shows error dialog.
+pub fn init_db(db_path: &Path) -> Result<(Connection, bool), AppError> {
+    let is_fresh = !db_path.exists();
+
+    // D-10: Backup existing DB before migration (before opening connection to avoid WAL issues)
+    let bak_path = db_path.with_extension("db.bak");
+    if !is_fresh {
+        if let Err(e) = std::fs::copy(db_path, &bak_path) {
+            log::warn!("Failed to backup DB before migration: {}", e);
+        }
+    }
+
+    let mut conn = Connection::open(db_path)?;
+    conn.execute_batch(
+        "PRAGMA journal_mode=WAL;
+         PRAGMA foreign_keys=ON;",
     )?;
-    Ok(())
+
+    let migrations = Migrations::new(MIGRATIONS.to_vec());
+    if let Err(e) = migrations.to_latest(&mut conn) {
+        log::error!("Migration failed: {}", e);
+        // D-11: Restore from backup on failure
+        drop(conn);
+        if bak_path.exists() {
+            if let Err(restore_err) = std::fs::copy(&bak_path, db_path) {
+                log::error!("Failed to restore DB from backup: {}", restore_err);
+            }
+        }
+        // Re-open the pre-migration DB so the app can still run
+        let fallback_conn = Connection::open(db_path)?;
+        fallback_conn.execute_batch(
+            "PRAGMA journal_mode=WAL;
+             PRAGMA foreign_keys=ON;",
+        )?;
+        return Err(AppError::Migration(format!(
+            "Database migration failed: {}. The database has been restored from backup.",
+            e
+        )));
+    }
+
+    Ok((conn, is_fresh))
 }
 
 #[cfg(test)]
@@ -78,13 +111,15 @@ mod config_tests {
     use rusqlite::{Connection, OptionalExtension};
 
     fn test_db() -> Connection {
-        let conn = Connection::open_in_memory().unwrap();
+        let mut conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(
             "PRAGMA journal_mode=WAL;
              PRAGMA foreign_keys=ON;",
         )
         .unwrap();
-        migrate(&conn).unwrap();
+        Migrations::new(MIGRATIONS.to_vec())
+            .to_latest(&mut conn)
+            .unwrap();
         conn
     }
 
@@ -117,15 +152,22 @@ mod config_tests {
 
     #[test]
     fn test_app_config_migrate_is_idempotent() {
-        let conn = test_db();
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL;
+             PRAGMA foreign_keys=ON;",
+        )
+        .unwrap();
+        let migrations = Migrations::new(MIGRATIONS.to_vec());
+        migrations.to_latest(&mut conn).unwrap();
         // Simulate user customizing the port
         conn.execute(
             "UPDATE app_config SET value = '9999' WHERE key = 'mcp_port'",
             [],
         )
         .unwrap();
-        // Re-run migration (e.g. after app update)
-        migrate(&conn).unwrap();
+        // Re-run migration (e.g. after app update) — library skips already-applied migrations
+        migrations.to_latest(&mut conn).unwrap();
         // Custom value must be preserved
         let val: String = conn
             .query_row(
@@ -135,5 +177,10 @@ mod config_tests {
             )
             .unwrap();
         assert_eq!(val, "9999");
+    }
+
+    #[test]
+    fn migrations_validate() {
+        assert!(Migrations::new(MIGRATIONS.to_vec()).validate().is_ok());
     }
 }

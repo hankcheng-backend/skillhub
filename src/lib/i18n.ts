@@ -114,6 +114,12 @@ const translations = {
     fillAllFields: "請填寫所有必填欄位。",
     add: "新增",
     comingSoon: "即將推出",
+    addSourceErrNameRequired: "來源名稱不可為空。",
+    addSourceErrRepoUrlRequired: "請填寫 GitLab 儲存庫網址。",
+    addSourceErrTokenRequired: "請填寫 GitLab 個人存取權杖。",
+    addSourceErrInvalidRepoUrl: "GitLab 儲存庫網址格式不正確。",
+    addSourceErrUnauthorized: "GitLab 驗證失敗：Token 無效或權限不足。",
+    addSourceErrNetwork: "無法連線到 GitLab，請檢查網路或伺服器狀態。",
 
     // Agent directory
     skillDir: "技能目錄",
@@ -126,6 +132,17 @@ const translations = {
 
     // Placeholders
     placeholderFolderId: "Google Drive 資料夾 ID",
+    placeholderSourceName: "company-skills",
+    placeholderRepoUrl: "https://gitlab.com/...",
+    placeholderToken: "glpat-...",
+
+    // PAT expiry
+    patExpiredBadge: "Token 已過期",
+    patExpiredTitle: "更新 GitLab Token",
+    patExpiredDesc: "此來源的 Personal Access Token 已過期或無效，請輸入新的 Token。",
+    patExpiredSave: "儲存",
+    patUpdateSuccess: "Token 已更新",
+    patUpdateFailed: "Token 更新失敗",
   },
   en: {
     // Layout
@@ -242,6 +259,12 @@ const translations = {
     fillAllFields: "Please fill in all required fields.",
     add: "Add",
     comingSoon: "Coming soon",
+    addSourceErrNameRequired: "Source name cannot be empty.",
+    addSourceErrRepoUrlRequired: "GitLab repository URL is required.",
+    addSourceErrTokenRequired: "GitLab Personal Access Token is required.",
+    addSourceErrInvalidRepoUrl: "Invalid GitLab repository URL.",
+    addSourceErrUnauthorized: "GitLab authentication failed: invalid token or insufficient permissions.",
+    addSourceErrNetwork: "Cannot connect to GitLab. Check your network or server status.",
 
     // Agent directory
     skillDir: "Skill Directory",
@@ -254,11 +277,22 @@ const translations = {
 
     // Placeholders
     placeholderFolderId: "Google Drive folder ID",
+    placeholderSourceName: "company-skills",
+    placeholderRepoUrl: "https://gitlab.com/...",
+    placeholderToken: "glpat-...",
+
+    // PAT expiry
+    patExpiredBadge: "Token expired",
+    patExpiredTitle: "Update GitLab Token",
+    patExpiredDesc: "The Personal Access Token for this source has expired or is invalid. Enter a new token.",
+    patExpiredSave: "Save",
+    patUpdateSuccess: "Token updated",
+    patUpdateFailed: "Failed to update token",
   },
 } as const;
 
 type Lang = keyof typeof translations;
-type Key = keyof typeof translations["zh-TW"];
+export type Key = keyof typeof translations["zh-TW"];
 
 function getLang(): Lang {
   const stored = localStorage.getItem("lang");

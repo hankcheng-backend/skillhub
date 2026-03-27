@@ -32,6 +32,7 @@ lerna-debug.log*
 .claude/
 .superpowers/
 .worktrees/
+CLAUDE.md
 
 # Dev docs (not shipped)
 doc/
@@ -39,3 +40,4 @@ docs/
 
 # Misc
 *.local
+.planning/
