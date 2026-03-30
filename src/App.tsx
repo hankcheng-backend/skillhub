@@ -107,6 +107,15 @@ function App() {
     }
   };
 
+  const handleDeleteSource = async (sourceId: string) => {
+    await api.removeSource(sourceId);
+    await loadSources();
+    if (activeSource === sourceId) {
+      setActiveSource("local");
+      setRemoteSkills([]);
+    }
+  };
+
   const handleTokenUpdateSuccess = async (sourceId: string) => {
     setExpiredSourceIds(prev => {
       const next = new Set(prev);
@@ -136,6 +145,7 @@ function App() {
           onAddSource={() => setShowAddSource(true)}
           expiredSourceIds={expiredSourceIds}
           onTokenUpdate={(sourceId) => setTokenUpdateSourceId(sourceId)}
+          onDeleteSource={handleDeleteSource}
         />
       }
       onSettings={() => setShowSettings(!showSettings)}
