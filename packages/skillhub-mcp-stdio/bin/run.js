@@ -6,9 +6,9 @@ const path = require("path");
 const os = require("os");
 
 const PLATFORMS = {
-  "darwin-arm64": "skillhub-mcp-stdio-darwin-arm64",
-  "darwin-x64": "skillhub-mcp-stdio-darwin-x64",
-  "win32-x64": "skillhub-mcp-stdio-win32-x64",
+  "darwin-arm64": "@llamohank/skillhub-mcp-stdio-darwin-arm64",
+  "darwin-x64": "@llamohank/skillhub-mcp-stdio-darwin-x64",
+  "win32-x64": "@llamohank/skillhub-mcp-stdio-win32-x64",
 };
 
 const key = `${os.platform()}-${os.arch()}`;

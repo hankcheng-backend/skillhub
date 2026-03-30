@@ -1,5 +1,5 @@
 {
-  "name": "skillhub-mcp-stdio-darwin-x64",
+  "name": "@llamohank/skillhub-mcp-stdio-darwin-x64",
   "version": "0.0.0",
   "description": "SkillHub MCP stdio binary for macOS Intel",
   "os": ["darwin"],

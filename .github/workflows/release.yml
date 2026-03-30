@@ -143,13 +143,13 @@ jobs:
           for pkg in skillhub-mcp-stdio-darwin-arm64 \
                      skillhub-mcp-stdio-darwin-x64 \
                      skillhub-mcp-stdio-win32-x64; do
-            echo "Publishing $pkg@$VERSION"
+            echo "Publishing @llamohank/$pkg@$VERSION"
             cd "packages/$pkg"
             npm publish --access public
             cd ../..
           done
 
           # Publish main package last (depends on platform packages)
-          echo "Publishing skillhub-mcp-stdio@$VERSION"
+          echo "Publishing @llamohank/skillhub-mcp-stdio@$VERSION"
           cd packages/skillhub-mcp-stdio
           npm publish --access public
