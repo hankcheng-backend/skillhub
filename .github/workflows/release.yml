@@ -18,7 +18,7 @@ jobs:
             tauri-args: --target aarch64-apple-darwin
             mcp-binary: skillhub-mcp-stdio
             mcp-artifact: skillhub-mcp-stdio-darwin-arm64
-          - platform: macos-13
+          - platform: macos-latest
             rust-target: x86_64-apple-darwin
             tauri-args: --target x86_64-apple-darwin
             mcp-binary: skillhub-mcp-stdio
