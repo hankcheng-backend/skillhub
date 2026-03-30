@@ -147,6 +147,50 @@ body {
   font-weight: 500;
 }
 
+/* -- Sidebar Context Menu -- */
+.sidebar-context-menu {
+  position: fixed;
+  z-index: 300;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 0;
+  min-width: 160px;
+  box-shadow: 0 8px 24px rgba(45, 35, 32, 0.18);
+  animation: contextMenuIn 0.12s ease-out;
+}
+
+@keyframes contextMenuIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.sidebar-context-menu-item {
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--danger);
+  transition: background 0.1s ease;
+  border: none;
+  background: none;
+  width: 100%;
+  font-family: inherit;
+  text-align: left;
+}
+
+.sidebar-context-menu-item:hover {
+  background: rgba(229, 57, 53, 0.08);
+}
+
+.sidebar-context-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 299;
+}
+
 /* ── Skill Grid ────────────────────────────────── */
 .skill-grid {
   display: grid;

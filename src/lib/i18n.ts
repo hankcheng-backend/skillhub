@@ -80,6 +80,9 @@ const translations = {
     deleteSkill: "刪除技能",
     deleteConfirmMsg: "確定要刪除",
     deleteConfirmSuffix: "嗎？此操作無法復原。",
+    deleteSource: "刪除來源",
+    deleteSourceConfirmMsg: "確定要刪除來源",
+    deleteSourceConfirmSuffix: "嗎？此操作無法復原。",
     deleting: "刪除中...",
     cancel: "取消",
 
@@ -225,6 +228,9 @@ const translations = {
     deleteSkill: "Delete Skill",
     deleteConfirmMsg: "Are you sure you want to delete",
     deleteConfirmSuffix: "? This action cannot be undone.",
+    deleteSource: "Delete Source",
+    deleteSourceConfirmMsg: "Are you sure you want to delete source",
+    deleteSourceConfirmSuffix: "? This action cannot be undone.",
     deleting: "Deleting...",
     cancel: "Cancel",
 
