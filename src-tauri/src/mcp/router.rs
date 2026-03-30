@@ -1,6 +1,6 @@
 use axum::{
     extract::State as AxumState,
-    http::header::{ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN},
+    http::HeaderValue,
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
@@ -8,6 +8,7 @@ use axum::{
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 
 use super::tools;
 
@@ -30,20 +31,25 @@ struct McpError {
 }
 
 pub fn create_router(db: SharedDb) -> Router {
+    let cors = CorsLayer::new()
+        .allow_origin(AllowOrigin::list([
+            HeaderValue::from_static("tauri://localhost"),
+            HeaderValue::from_static("http://localhost:1420"),
+        ]))
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+        ]);
+
     Router::new()
         .route("/health", get(health))
         .route("/mcp", post(handle_mcp))
+        .layer(cors)
         .with_state(db)
 }
 
 async fn health() -> impl IntoResponse {
-    (
-        [
-            (ACCESS_CONTROL_ALLOW_ORIGIN, "*"),
-            (ACCESS_CONTROL_ALLOW_METHODS, "GET"),
-        ],
-        axum::http::StatusCode::OK,
-    )
+    axum::http::StatusCode::OK
 }
 
 async fn handle_mcp(
@@ -66,7 +72,7 @@ async fn handle_mcp(
         "upload_skill" => tools::upload_skill_tool(&db, req.params).await,
         // Sources
         "list_sources" => tools::list_sources_tool(&db),
-        "add_source" => tools::add_source_tool(&db, req.params),
+        "add_source" => tools::add_source_tool(&db, req.params).await,
         "remove_source" => tools::remove_source_tool(&db, req.params),
         "browse_source" => tools::browse_source_tool(&db, req.params).await,
         // Agents
@@ -89,12 +95,39 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use tower::util::ServiceExt;
 
-    #[tokio::test]
-    async fn health_endpoint_exposes_cors_header_for_ui_polling() {
-        let db = Arc::new(Mutex::new(
+    fn make_db() -> SharedDb {
+        Arc::new(Mutex::new(
             Connection::open_in_memory().expect("open in-memory DB"),
-        ));
-        let app = create_router(db);
+        ))
+    }
+
+    #[tokio::test]
+    async fn health_endpoint_allows_tauri_localhost_origin() {
+        let app = create_router(make_db());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .method("GET")
+                    .header("Origin", "tauri://localhost")
+                    .body(Body::empty())
+                    .expect("build request"),
+            )
+            .await
+            .expect("request health endpoint");
+
+        assert!(response.status().is_success());
+        let allow_origin = response
+            .headers()
+            .get("access-control-allow-origin")
+            .and_then(|v| v.to_str().ok());
+        assert_eq!(allow_origin, Some("tauri://localhost"));
+    }
+
+    #[tokio::test]
+    async fn health_endpoint_allows_dev_origin() {
+        let app = create_router(make_db());
 
         let response = app
             .oneshot(
@@ -112,7 +145,32 @@ mod tests {
         let allow_origin = response
             .headers()
             .get("access-control-allow-origin")
-            .and_then(|value| value.to_str().ok());
-        assert_eq!(allow_origin, Some("*"));
+            .and_then(|v| v.to_str().ok());
+        assert_eq!(allow_origin, Some("http://localhost:1420"));
+    }
+
+    #[tokio::test]
+    async fn health_endpoint_rejects_unknown_origin() {
+        let app = create_router(make_db());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .method("GET")
+                    .header("Origin", "https://evil.example.com")
+                    .body(Body::empty())
+                    .expect("build request"),
+            )
+            .await
+            .expect("request health endpoint");
+
+        // Status is still 200 but CORS header must not reflect the disallowed origin
+        assert!(response.status().is_success());
+        let allow_origin = response
+            .headers()
+            .get("access-control-allow-origin")
+            .and_then(|v| v.to_str().ok());
+        assert_ne!(allow_origin, Some("https://evil.example.com"));
     }
 }

@@ -7,6 +7,7 @@ import { Sidebar } from "./components/Sidebar";
 import { SkillGrid } from "./components/SkillGrid";
 import { SettingsGeneral } from "./components/SettingsGeneral";
 import { AddSourceDialog } from "./components/AddSourceDialog";
+import { UpdateTokenDialog } from "./components/UpdateTokenDialog";
 import "./styles/globals.css";
 
 const SOURCE_AUTO_REFRESH_SECONDS = 15;
@@ -20,6 +21,8 @@ function App() {
   const [showAddSource, setShowAddSource] = useState(false);
   const [remoteSkills, setRemoteSkills] = useState<RemoteSkill[]>([]);
   const [browsing, setBrowsing] = useState(false);
+  const [expiredSourceIds, setExpiredSourceIds] = useState<Set<string>>(new Set());
+  const [tokenUpdateSourceId, setTokenUpdateSourceId] = useState<string | null>(null);
 
   const loadSkills = async () => {
     const s = await api.listSkills();
@@ -35,6 +38,7 @@ function App() {
     loadSkills();
     loadSources();
     const unlisten = listen("skills-changed", () => loadSkills());
+
     return () => { unlisten.then(fn => fn()); };
   }, []);
 
@@ -64,7 +68,11 @@ function App() {
           setRemoteSkills(latest);
           hasLoadedOnce = true;
         }
-      } catch {
+      } catch (e: unknown) {
+        const err = e as { kind?: string; message?: string };
+        if (err.kind === "TokenExpired") {
+          setExpiredSourceIds(prev => new Set([...prev, activeSource]));
+        }
         if (!cancelled && isInitialLoad) {
           setRemoteSkills([]);
         }
@@ -99,6 +107,25 @@ function App() {
     }
   };
 
+  const handleTokenUpdateSuccess = async (sourceId: string) => {
+    setExpiredSourceIds(prev => {
+      const next = new Set(prev);
+      next.delete(sourceId);
+      return next;
+    });
+    setTokenUpdateSourceId(null);
+    setActiveSource(sourceId);
+    setBrowsing(true);
+    try {
+      const latest = await api.browseSource(sourceId);
+      setRemoteSkills(latest);
+    } catch {
+      setRemoteSkills([]);
+    } finally {
+      setBrowsing(false);
+    }
+  };
+
   return (
     <Layout
       sidebar={
@@ -107,6 +134,8 @@ function App() {
           activeSource={activeSource}
           onSelectSource={handleSelectSource}
           onAddSource={() => setShowAddSource(true)}
+          expiredSourceIds={expiredSourceIds}
+          onTokenUpdate={(sourceId) => setTokenUpdateSourceId(sourceId)}
         />
       }
       onSettings={() => setShowSettings(!showSettings)}
@@ -125,6 +154,14 @@ function App() {
         />
       )}
       {showAddSource && <AddSourceDialog onClose={() => setShowAddSource(false)} onAdded={loadSources} />}
+      {tokenUpdateSourceId && (
+        <UpdateTokenDialog
+          sourceId={tokenUpdateSourceId}
+          sourceName={sources.find(s => s.id === tokenUpdateSourceId)?.name ?? ""}
+          onClose={() => setTokenUpdateSourceId(null)}
+          onSuccess={() => { void handleTokenUpdateSuccess(tokenUpdateSourceId); }}
+        />
+      )}
     </Layout>
   );
 }

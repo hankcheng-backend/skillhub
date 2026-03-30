@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../lib/tauri";
+import { formatAddSourceError } from "../lib/error";
 import { t } from "../lib/i18n";
 
 interface AddSourceDialogProps {
@@ -40,7 +41,7 @@ export function AddSourceDialog({ onClose, onAdded }: AddSourceDialogProps) {
       onAdded();
       onClose();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatAddSourceError(e));
     }
   };
 
@@ -67,7 +68,7 @@ export function AddSourceDialog({ onClose, onAdded }: AddSourceDialogProps) {
           <input
             value={name}
             onChange={e => setName(e.target.value)}
-            placeholder="company-skills"
+            placeholder={t("placeholderSourceName")}
             className="form-input"
           />
         </div>
@@ -79,7 +80,7 @@ export function AddSourceDialog({ onClose, onAdded }: AddSourceDialogProps) {
           <input
             value={url}
             onChange={e => setUrl(e.target.value)}
-            placeholder={type === "gitlab" ? "https://gitlab.com/..." : t("placeholderFolderId")}
+            placeholder={type === "gitlab" ? t("placeholderRepoUrl") : t("placeholderFolderId")}
             className="form-input"
           />
         </div>
@@ -91,7 +92,7 @@ export function AddSourceDialog({ onClose, onAdded }: AddSourceDialogProps) {
               type="password"
               value={token}
               onChange={e => setToken(e.target.value)}
-              placeholder="glpat-..."
+              placeholder={t("placeholderToken")}
               className="form-input"
             />
           </div>

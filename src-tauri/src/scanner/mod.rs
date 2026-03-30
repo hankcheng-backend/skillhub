@@ -20,7 +20,7 @@ pub fn scan_all(conn: &Connection) -> Result<Vec<Skill>, AppError> {
     let all_agents = Agent::all(conn)?;
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_default()
         .as_secs() as i64;
 
     let agent_roots = all_agents
@@ -82,10 +82,9 @@ fn scan_agent_dir(
         let is_symlink = metadata.is_symlink();
 
         let skill_md = find_skill_md(&path);
-        if skill_md.is_none() {
+        let Some(skill_md) = skill_md else {
             continue;
-        }
-        let skill_md = skill_md.unwrap();
+        };
 
         if is_symlink {
             let target = fs::read_link(&path)?;

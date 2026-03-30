@@ -1,0 +1,155 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            rust-target: aarch64-apple-darwin
+            tauri-args: --target aarch64-apple-darwin
+            mcp-binary: skillhub-mcp-stdio
+            mcp-artifact: skillhub-mcp-stdio-darwin-arm64
+          - platform: macos-13
+            rust-target: x86_64-apple-darwin
+            tauri-args: --target x86_64-apple-darwin
+            mcp-binary: skillhub-mcp-stdio
+            mcp-artifact: skillhub-mcp-stdio-darwin-x64
+          - platform: windows-latest
+            rust-target: x86_64-pc-windows-msvc
+            tauri-args: ""
+            mcp-binary: skillhub-mcp-stdio.exe
+            mcp-artifact: skillhub-mcp-stdio-win32-x64
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-release-
+
+      # ── Tauri desktop app ──
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "SkillHub ${{ github.ref_name }}"
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.tauri-args }}
+
+      # ── MCP stdio binary ──
+      - name: Build MCP stdio binary
+        working-directory: src-tauri
+        run: cargo build --release --bin skillhub-mcp-stdio --target ${{ matrix.rust-target }}
+
+      - name: Upload MCP binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.mcp-artifact }}
+          path: src-tauri/target/${{ matrix.rust-target }}/release/${{ matrix.mcp-binary }}
+
+      - name: Upload MCP binary to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+          SRC="src-tauri/target/${{ matrix.rust-target }}/release/${{ matrix.mcp-binary }}"
+          DEST="${{ matrix.mcp-artifact }}${{ runner.os == 'Windows' && '.exe' || '' }}"
+          cp "$SRC" "$DEST"
+          # Wait for draft release to exist (created by tauri-action)
+          for i in 1 2 3 4 5; do
+            gh release view "$TAG" && break || sleep 10
+          done
+          gh release upload "$TAG" "$DEST" --clobber
+
+  publish-npm:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Download all MCP binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare and publish npm packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Publishing version: $VERSION"
+
+          # Copy binaries into platform packages
+          mkdir -p packages/skillhub-mcp-stdio-darwin-arm64/bin
+          cp artifacts/skillhub-mcp-stdio-darwin-arm64/skillhub-mcp-stdio \
+             packages/skillhub-mcp-stdio-darwin-arm64/bin/
+          chmod +x packages/skillhub-mcp-stdio-darwin-arm64/bin/skillhub-mcp-stdio
+
+          mkdir -p packages/skillhub-mcp-stdio-darwin-x64/bin
+          cp artifacts/skillhub-mcp-stdio-darwin-x64/skillhub-mcp-stdio \
+             packages/skillhub-mcp-stdio-darwin-x64/bin/
+          chmod +x packages/skillhub-mcp-stdio-darwin-x64/bin/skillhub-mcp-stdio
+
+          mkdir -p packages/skillhub-mcp-stdio-win32-x64/bin
+          cp artifacts/skillhub-mcp-stdio-win32-x64/skillhub-mcp-stdio.exe \
+             packages/skillhub-mcp-stdio-win32-x64/bin/
+
+          # Stamp version in all package.json files
+          for f in packages/*/package.json; do
+            sed -i "s/\"0.0.0\"/\"$VERSION\"/g" "$f"
+          done
+
+          # Publish platform packages first
+          for pkg in skillhub-mcp-stdio-darwin-arm64 \
+                     skillhub-mcp-stdio-darwin-x64 \
+                     skillhub-mcp-stdio-win32-x64; do
+            echo "Publishing $pkg@$VERSION"
+            cd "packages/$pkg"
+            npm publish --access public
+            cd ../..
+          done
+
+          # Publish main package last (depends on platform packages)
+          echo "Publishing skillhub-mcp-stdio@$VERSION"
+          cd packages/skillhub-mcp-stdio
+          npm publish --access public

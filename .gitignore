@@ -32,10 +32,19 @@ lerna-debug.log*
 .claude/
 .superpowers/
 .worktrees/
+CLAUDE.md
 
 # Dev docs (not shipped)
 doc/
 docs/
 
+# Tests (integration tests — not shipped in open-source release)
+src-tauri/tests/
+
+# MCP binary artifacts (built in CI, not committed)
+packages/*/bin/skillhub-mcp-stdio
+packages/*/bin/skillhub-mcp-stdio.exe
+
 # Misc
 *.local
+.planning/

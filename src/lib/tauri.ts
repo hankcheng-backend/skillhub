@@ -21,6 +21,8 @@ export const api = {
   addSource: (name: string, sourceType: string, url?: string, folderId?: string, token?: string) =>
     invoke<Source>("add_source", { name, sourceType, url, folderId, token }),
   removeSource: (sourceId: string) => invoke("remove_source", { sourceId }),
+  updateSourceToken: (sourceId: string, newToken: string) =>
+    invoke<void>("update_source_token", { sourceId, newToken }),
   browseSource: (sourceId: string) =>
     invoke<RemoteSkill[]>("browse_source", { sourceId }),
   installSkill: (sourceId: string, folderName: string, targetAgent: string, force?: boolean) =>
