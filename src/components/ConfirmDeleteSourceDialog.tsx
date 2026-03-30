@@ -23,7 +23,7 @@ export function ConfirmDeleteSourceDialog({ sourceName, onConfirm, onCancel }: C
     <div className="dialog-overlay" onClick={onCancel}>
       <div
         className="confirm-dialog"
-        style={{ position: "relative", top: "auto", left: "auto", transform: "none" }}
+        style={{ position: "relative", top: "auto", left: "auto", transform: "none", animation: "dialogIn 0.3s cubic-bezier(0.22, 1, 0.36, 1)" }}
         onClick={e => e.stopPropagation()}
       >
         <div className="confirm-dialog-icon">
