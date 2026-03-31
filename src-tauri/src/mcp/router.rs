@@ -36,10 +36,7 @@ pub fn create_router(db: SharedDb) -> Router {
             HeaderValue::from_static("tauri://localhost"),
             HeaderValue::from_static("http://localhost:1420"),
         ]))
-        .allow_methods([
-            axum::http::Method::GET,
-            axum::http::Method::POST,
-        ]);
+        .allow_methods([axum::http::Method::GET, axum::http::Method::POST]);
 
     Router::new()
         .route("/health", get(health))

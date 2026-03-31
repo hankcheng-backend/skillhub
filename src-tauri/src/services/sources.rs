@@ -288,9 +288,7 @@ pub async fn add_source(
         id: source_id.clone(),
         name: trimmed_name.to_string(),
         source_type: source_type.to_string(),
-        url: url
-            .map(|v| v.trim().to_string())
-            .filter(|v| !v.is_empty()),
+        url: url.map(|v| v.trim().to_string()).filter(|v| !v.is_empty()),
         folder_id: folder_id
             .map(|v| v.trim().to_string())
             .filter(|v| !v.is_empty()),

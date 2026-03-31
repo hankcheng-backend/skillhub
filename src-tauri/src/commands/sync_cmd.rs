@@ -9,7 +9,9 @@ pub fn sync_skill(
     skill_id: String,
     target_agent: String,
 ) -> Result<(), AppError> {
-    let conn = db.lock().map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
+    let conn = db
+        .lock()
+        .map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
     sync_svc::sync_skill(&conn, &skill_id, &target_agent)
 }
 
@@ -19,6 +21,8 @@ pub fn unsync_skill(
     skill_id: String,
     agent: String,
 ) -> Result<(), AppError> {
-    let conn = db.lock().map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
+    let conn = db
+        .lock()
+        .map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
     sync_svc::unsync_skill(&conn, &skill_id, &agent)
 }

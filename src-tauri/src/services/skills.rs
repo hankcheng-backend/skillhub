@@ -94,7 +94,13 @@ mod tests {
         )
         .unwrap();
 
-        update_skill_meta(&conn, "claude:test-skill", Some("rust,cli"), Some("test note")).unwrap();
+        update_skill_meta(
+            &conn,
+            "claude:test-skill",
+            Some("rust,cli"),
+            Some("test note"),
+        )
+        .unwrap();
 
         let (tags, notes): (Option<String>, Option<String>) = conn
             .query_row(

@@ -8,7 +8,9 @@ use tauri::State;
 
 #[tauri::command]
 pub fn list_sources(db: State<'_, DbState>) -> Result<Vec<Source>, AppError> {
-    let conn = db.lock().map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
+    let conn = db
+        .lock()
+        .map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
     Source::all(&conn).map_err(AppError::from)
 }
 
@@ -37,7 +39,9 @@ pub async fn add_source(
 #[tauri::command]
 pub fn remove_source(db: State<'_, DbState>, source_id: String) -> Result<(), AppError> {
     let token_store = KeyringTokenStore;
-    let conn = db.lock().map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
+    let conn = db
+        .lock()
+        .map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
     sources_svc::remove_source(&conn, &token_store, &source_id)
 }
 
@@ -48,7 +52,9 @@ pub async fn update_source_token(
     new_token: String,
 ) -> Result<(), AppError> {
     let token_store = KeyringTokenStore;
-    let conn = db.lock().map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
+    let conn = db
+        .lock()
+        .map_err(|e| AppError::Internal(format!("DB lock poisoned: {}", e)))?;
     sources_svc::update_source_token(&conn, &token_store, &source_id, &new_token)
 }
 

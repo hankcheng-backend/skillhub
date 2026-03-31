@@ -104,7 +104,11 @@ mod tests {
         let codex_cfg = temp.path().join(".codex");
         let symlink_path = codex_cfg.join("skills").join("alpha");
         let metadata = std::fs::symlink_metadata(&symlink_path).unwrap();
-        assert!(metadata.is_symlink(), "Expected symlink at {:?}", symlink_path);
+        assert!(
+            metadata.is_symlink(),
+            "Expected symlink at {:?}",
+            symlink_path
+        );
 
         // Verify SkillSync row exists in DB
         let count: i64 = conn
@@ -192,11 +196,7 @@ mod tests {
 }
 
 /// Create a symlink from origin to target_agent and record it in the DB.
-pub fn sync_skill(
-    conn: &Connection,
-    skill_id: &str,
-    target_agent: &str,
-) -> Result<(), AppError> {
+pub fn sync_skill(conn: &Connection, skill_id: &str, target_agent: &str) -> Result<(), AppError> {
     let skills = Skill::all_with_syncs(conn)?;
     let skill = skills
         .iter()

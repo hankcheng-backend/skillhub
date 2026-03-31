@@ -12,24 +12,27 @@ type Db = Arc<Mutex<Connection>>;
 // ---------------------------------------------------------------------------
 
 fn auto_scan(db: &Db) -> Result<(), String> {
-    let conn = db
-        .lock()
-        .map_err(|e| format!("Failed to acquire database lock: {} — retry the operation", e))?;
-    crate::scanner::scan_all(&conn)
-        .map(|_| ())
-        .map_err(|e| {
-            format!(
-                "Skill scan failed: {} — check agent directories exist and are readable",
-                e
-            )
-        })
+    let conn = db.lock().map_err(|e| {
+        format!(
+            "Failed to acquire database lock: {} — retry the operation",
+            e
+        )
+    })?;
+    crate::scanner::scan_all(&conn).map(|_| ()).map_err(|e| {
+        format!(
+            "Skill scan failed: {} — check agent directories exist and are readable",
+            e
+        )
+    })
 }
 
 fn require_str<'a>(params: &'a Value, key: &str) -> Result<&'a str, String> {
-    params
-        .get(key)
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| format!("Missing required parameter '{}' — include it in your request", key))
+    params.get(key).and_then(|v| v.as_str()).ok_or_else(|| {
+        format!(
+            "Missing required parameter '{}' — include it in your request",
+            key
+        )
+    })
 }
 
 fn opt_str<'a>(params: &'a Value, key: &str) -> Option<&'a str> {
@@ -37,10 +40,7 @@ fn opt_str<'a>(params: &'a Value, key: &str) -> Option<&'a str> {
 }
 
 fn opt_bool(params: &Value, key: &str) -> bool {
-    params
-        .get(key)
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
+    params.get(key).and_then(|v| v.as_bool()).unwrap_or(false)
 }
 
 fn skill_to_json(s: &Skill) -> Value {
@@ -87,7 +87,9 @@ async fn fetch_remote_skills(
             Err(e) => {
                 return (
                     vec![],
-                    vec![json!({"error": format!("Failed to list sources: {} — check database integrity", e)})],
+                    vec![
+                        json!({"error": format!("Failed to list sources: {} — check database integrity", e)}),
+                    ],
                 )
             }
         }
@@ -182,8 +184,8 @@ pub async fn search_skills(db: &Db, params: Value) -> Result<Value, String> {
         let conn = db
             .lock()
             .map_err(|_| "Failed to acquire database lock — retry the search".to_string())?;
-        let skills = Skill::all_with_syncs(&conn)
-            .map_err(|e| format!("Failed to list skills: {}", e))?;
+        let skills =
+            Skill::all_with_syncs(&conn).map_err(|e| format!("Failed to list skills: {}", e))?;
         for s in &skills {
             if matches_query(
                 &q,
@@ -202,8 +204,7 @@ pub async fn search_skills(db: &Db, params: Value) -> Result<Value, String> {
     // Remote
     if scope == "remote" || scope == "all" {
         let source_filter = opt_str(&params, "source_id");
-        let (remote_results, remote_errors) =
-            fetch_remote_skills(db, source_filter, query).await;
+        let (remote_results, remote_errors) = fetch_remote_skills(db, source_filter, query).await;
         all_results.extend(remote_results);
         all_errors.extend(remote_errors);
     }
@@ -251,8 +252,12 @@ pub async fn get_skill_content(db: &Db, params: Value) -> Result<Value, String> 
         let token_store = KeyringTokenStore;
         let (source_type, url, token) = {
             let conn = db.lock().map_err(|e| e.to_string())?;
-            let source = Source::find_by_id(&conn, source_id)
-                .map_err(|_| format!("Source not found: {} — use list_sources to see valid source IDs", source_id))?;
+            let source = Source::find_by_id(&conn, source_id).map_err(|_| {
+                format!(
+                    "Source not found: {} — use list_sources to see valid source IDs",
+                    source_id
+                )
+            })?;
             let token = sources_svc::get_source_token(&conn, &token_store, source_id)
                 .map_err(|e| e.to_string())?;
             (source.source_type, source.url, token)
@@ -261,10 +266,9 @@ pub async fn get_skill_content(db: &Db, params: Value) -> Result<Value, String> 
             return Err(format!("Unsupported source type: {}", source_type));
         }
         let repo_url = url.ok_or("GitLab source has no URL configured")?;
-        let content =
-            crate::remote::gitlab::get_skill_content(&repo_url, folder_name, &token)
-                .await
-                .map_err(|e| e.to_string())?;
+        let content = crate::remote::gitlab::get_skill_content(&repo_url, folder_name, &token)
+            .await
+            .map_err(|e| e.to_string())?;
         return Ok(json!({
             "source": "remote",
             "source_id": source_id,
@@ -282,8 +286,12 @@ pub async fn get_skill_content(db: &Db, params: Value) -> Result<Value, String> 
     let (agent_id, folder_name) = (parts[0], parts[1]);
 
     let conn = db.lock().map_err(|e| e.to_string())?;
-    let agent = Agent::find_by_id(&conn, agent_id)
-        .map_err(|_| format!("Agent not found: {} — use get_agents to see available agents", agent_id))?;
+    let agent = Agent::find_by_id(&conn, agent_id).map_err(|_| {
+        format!(
+            "Agent not found: {} — use get_agents to see available agents",
+            agent_id
+        )
+    })?;
     let skill_dir = agent.resolved_skill_dir().join(folder_name);
     for name in &["skill.md", "SKILL.md"] {
         let path = skill_dir.join(name);
@@ -311,8 +319,7 @@ pub fn sync_skill_tool(db: &Db, params: Value) -> Result<Value, String> {
     let target_agent = require_str(&params, "target_agent")?;
 
     let conn = db.lock().map_err(|e| e.to_string())?;
-    crate::services::sync::sync_skill(&conn, skill_id, target_agent)
-        .map_err(|e| e.to_string())?;
+    crate::services::sync::sync_skill(&conn, skill_id, target_agent).map_err(|e| e.to_string())?;
 
     Ok(json!({"status": "ok"}))
 }
@@ -326,8 +333,7 @@ pub fn unsync_skill_tool(db: &Db, params: Value) -> Result<Value, String> {
     let agent = require_str(&params, "agent")?;
 
     let conn = db.lock().map_err(|e| e.to_string())?;
-    crate::services::sync::unsync_skill(&conn, skill_id, agent)
-        .map_err(|e| e.to_string())?;
+    crate::services::sync::unsync_skill(&conn, skill_id, agent).map_err(|e| e.to_string())?;
 
     Ok(json!({"status": "ok"}))
 }
@@ -343,9 +349,21 @@ pub async fn install_skill_tool(db: &Db, params: Value) -> Result<Value, String>
     let force = opt_bool(&params, "force");
     let token_store = KeyringTokenStore;
 
-    crate::services::install::install_skill(db, &token_store, source_id, folder_name, target_agent, force)
-        .await
-        .map_err(|e| format!("Failed to install skill: {} — verify source_id and folder_name are correct", e))?;
+    crate::services::install::install_skill(
+        db,
+        &token_store,
+        source_id,
+        folder_name,
+        target_agent,
+        force,
+    )
+    .await
+    .map_err(|e| {
+        format!(
+            "Failed to install skill: {} — verify source_id and folder_name are correct",
+            e
+        )
+    })?;
 
     Ok(json!({
         "status": "ok",
@@ -366,10 +384,12 @@ pub fn uninstall_skill_tool(db: &Db, params: Value) -> Result<Value, String> {
 
     if let Some(agent_id) = agent {
         let skills = Skill::all_with_syncs(&conn).map_err(|e| e.to_string())?;
-        let skill = skills
-            .iter()
-            .find(|s| s.id == skill_id)
-            .ok_or_else(|| format!("Skill not found: {} — use search_skills to find valid skill IDs", skill_id))?;
+        let skill = skills.iter().find(|s| s.id == skill_id).ok_or_else(|| {
+            format!(
+                "Skill not found: {} — use search_skills to find valid skill IDs",
+                skill_id
+            )
+        })?;
 
         if agent_id != skill.origin_agent && skill.synced_to.contains(&agent_id.to_string()) {
             crate::services::sync::unsync_skill(&conn, skill_id, agent_id)
@@ -428,7 +448,12 @@ pub async fn add_source_tool(db: &Db, params: Value) -> Result<Value, String> {
 
     let saved = sources_svc::add_source(db, &token_store, name, source_type, url, None, token)
         .await
-        .map_err(|e| format!("Failed to add source: {} — verify URL and token are correct", e))?;
+        .map_err(|e| {
+            format!(
+                "Failed to add source: {} — verify URL and token are correct",
+                e
+            )
+        })?;
     Ok(serde_json::to_value(saved).map_err(|e| e.to_string())?)
 }
 

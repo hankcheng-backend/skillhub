@@ -5,6 +5,7 @@ use crate::scanner;
 use crate::watcher;
 use rusqlite;
 use serde::Serialize;
+use std::process::{Command, Output};
 use std::sync::OnceLock;
 use tauri::{Emitter, State};
 use tauri_plugin_autostart::ManagerExt;
@@ -19,7 +20,7 @@ fn shell_path() -> &'static str {
     CACHED.get_or_init(|| {
         // Try the user's default shell first, fall back to /bin/zsh (macOS default)
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
-        let output = std::process::Command::new(&shell)
+        let output = Command::new(&shell)
             .args(["-ilc", "echo $PATH"])
             .output();
         match output {
@@ -43,9 +44,84 @@ fn shell_path() -> &'static str {
 
 /// Create a Command with the full shell PATH injected.
 fn command_with_path(program: &str) -> std::process::Command {
-    let mut cmd = std::process::Command::new(program);
+    let mut cmd = Command::new(program);
     cmd.env("PATH", shell_path());
     cmd
+}
+
+fn output_text(output: &Output) -> String {
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+    match (stdout.is_empty(), stderr.is_empty()) {
+        (false, false) => format!("{}\n{}", stdout, stderr),
+        (false, true) => stdout,
+        (true, false) => stderr,
+        (true, true) => String::new(),
+    }
+}
+
+fn normalize_version_token(token: &str) -> Option<String> {
+    let trimmed = token
+        .trim_matches(|c: char| !c.is_ascii_alphanumeric() && c != '.' && c != '-' && c != '+');
+    let trimmed = trimmed.strip_prefix('v').unwrap_or(trimmed);
+
+    let first = trimmed.chars().next()?;
+    if !first.is_ascii_digit() || !trimmed.contains('.') {
+        return None;
+    }
+
+    if trimmed
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+'))
+    {
+        Some(trimmed.to_string())
+    } else {
+        None
+    }
+}
+
+fn parse_version_text(text: &str) -> Option<String> {
+    text.split_whitespace().find_map(normalize_version_token)
+}
+
+fn resolve_command_path(program: &str) -> Option<String> {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let output = Command::new(&shell)
+        .args(["-ilc", &format!("command -v {}", program)])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(str::trim)
+        .find(|line| line.starts_with('/'))
+        .map(|line| line.to_string())
+}
+
+fn probe_version(program: &str) -> Option<String> {
+    let output = command_with_path(program).arg("--version").output().ok()?;
+    let text = output_text(&output);
+    parse_version_text(&text)
+}
+
+fn detect_agent_cli(program: &str) -> (bool, Option<String>) {
+    if let Some(version) = probe_version(program) {
+        return (true, Some(version));
+    }
+
+    if let Some(path) = resolve_command_path(program) {
+        return match probe_version(&path) {
+            Some(version) => (true, Some(version)),
+            None => (true, None),
+        };
+    }
+
+    (false, None)
 }
 
 #[derive(Serialize)]
@@ -128,30 +204,12 @@ pub async fn get_agent_versions() -> Result<Vec<AgentVersion>, AppError> {
 
         let mut results = vec![];
         for (id, cmd) in &agents_cmds {
-            let output = command_with_path(cmd).arg("--version").output();
-            match output {
-                Ok(out) if out.status.success() => {
-                    let raw = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                    // Extract semver token: "2.1.81 (Claude Code)" → "2.1.81", "codex-cli 0.116.0" → "0.116.0"
-                    let version = raw
-                        .split_whitespace()
-                        .find(|tok| tok.chars().next().map_or(false, |c| c.is_ascii_digit()))
-                        .unwrap_or(&raw)
-                        .to_string();
-                    results.push(AgentVersion {
-                        id: id.to_string(),
-                        installed: true,
-                        current_version: Some(version),
-                    });
-                }
-                _ => {
-                    results.push(AgentVersion {
-                        id: id.to_string(),
-                        installed: false,
-                        current_version: None,
-                    });
-                }
-            }
+            let (installed, current_version) = detect_agent_cli(cmd);
+            results.push(AgentVersion {
+                id: id.to_string(),
+                installed,
+                current_version,
+            });
         }
         Ok(results)
     })
@@ -268,15 +326,9 @@ pub async fn check_agent_dir(
     .collect();
 
     let agent_id_clone = agent_id.clone();
-    let is_installed = tokio::task::spawn_blocking(move || {
-        command_with_path(&agent_id_clone)
-            .arg("--version")
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
-    })
-    .await
-    .unwrap_or(false);
+    let is_installed = tokio::task::spawn_blocking(move || detect_agent_cli(&agent_id_clone).0)
+        .await
+        .unwrap_or(false);
 
     if !is_installed {
         let cmd = install_cmds
@@ -298,4 +350,29 @@ pub async fn pick_agent_dir(app: tauri::AppHandle) -> Result<Option<String>, App
     let picked = app.dialog().file().blocking_pick_folder();
 
     Ok(picked.map(|p| p.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{normalize_version_token, parse_version_text};
+
+    #[test]
+    fn parses_plain_semver_output() {
+        assert_eq!(
+            parse_version_text("codex-cli 0.117.0"),
+            Some("0.117.0".to_string())
+        );
+    }
+
+    #[test]
+    fn parses_semver_when_warning_precedes_version() {
+        let output = "WARNING: proceeding, even though we could not update PATH: Operation not permitted (os error 1)\ncodex-cli 0.117.0";
+        assert_eq!(parse_version_text(output), Some("0.117.0".to_string()));
+    }
+
+    #[test]
+    fn ignores_non_version_number_tokens() {
+        assert_eq!(normalize_version_token("1)"), None);
+        assert_eq!(normalize_version_token("(123)"), None);
+    }
 }

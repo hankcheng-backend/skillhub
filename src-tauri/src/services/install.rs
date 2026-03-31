@@ -104,7 +104,8 @@ mod tests {
                 .unwrap();
 
             // codex is disabled by default
-            let result = install_skill(&db, &token_store, "src-1", "my-skill", "codex", false).await;
+            let result =
+                install_skill(&db, &token_store, "src-1", "my-skill", "codex", false).await;
             assert!(result.is_err(), "Expected error for disabled agent");
             let msg = result.unwrap_err().to_string().to_lowercase();
             assert!(

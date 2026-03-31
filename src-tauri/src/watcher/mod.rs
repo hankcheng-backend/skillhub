@@ -1,5 +1,5 @@
 use crate::db::models::Agent;
-use notify_debouncer_mini::{new_debouncer, Debouncer, DebouncedEventKind};
+use notify_debouncer_mini::{new_debouncer, DebouncedEventKind, Debouncer};
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
